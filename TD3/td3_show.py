@@ -1,6 +1,6 @@
 import gym
 import torch
-from agent import Agent
+from td3.agent import Agent
 
 # Set the path to your trained model
 model_path = "td3_actor_1500.pth"
