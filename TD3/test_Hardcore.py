@@ -1,5 +1,5 @@
 import gym
-from td3.agent import Agent
+from TD3.agent import Agent
 
 env = gym.make("BipedalWalkerHardcore-v3", render_mode="human")
 obs_dim = env.observation_space.shape[0]

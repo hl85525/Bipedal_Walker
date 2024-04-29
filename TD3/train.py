@@ -2,8 +2,8 @@ import gym
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from td3.agent import Agent
-from td3.replay_buffer import ReplayBuffer
+from TD3.agent import Agent
+from TD3.replay_buffer import ReplayBuffer
 
 env = gym.make("BipedalWalker-v3")
 obs_dim = env.observation_space.shape[0]
