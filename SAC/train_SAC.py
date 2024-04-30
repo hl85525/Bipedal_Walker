@@ -4,7 +4,7 @@ import gym
 import random
 import torch
 import matplotlib.pyplot as plt
-from agent import DDPG_Agent, ReplayBuffer
+from agent import SAC_Agent, ReplayBuffer
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -20,14 +20,14 @@ env.action_space.seed(seed)
 
 max_action = float(env.action_space.high[0])
 
-agent = DDPG_Agent(
+agent = SAC_Agent(
     state_dim=obs_dim,
     action_dim=act_dim,
     max_action=max_action
 )
 
 replay_buffer = ReplayBuffer(obs_dim, act_dim, max_size=int(1e6))
-max_episodes = 2000
+max_episodes = 10
 max_steps_per_episode = 1000
 save_interval = 400
 render = False
@@ -44,8 +44,7 @@ for episode in range(1, max_episodes + 1):
     step_count = 0  # Reset the step count at the start of each episode
     while not done:
         action = agent.sample_action(state)
-        # Use a wildcard to capture all extra values
-        next_state, reward, done, *extras = env.step(action)
+        next_state, reward, done, info, _ = env.step(action)
         step_count += 1  # Increment the step count
 
         if reward <= -100:
@@ -54,8 +53,7 @@ for episode in range(1, max_episodes + 1):
         else:
             replay_buffer.add(state, action, reward, next_state, False)
 
-        if replay_buffer.size > 2000:
-            agent.train()
+        if replay_buffer.size > 2000: agent.train()
 
         if done or step_count >= max_steps_per_episode:
             break
@@ -75,7 +73,6 @@ for episode in range(1, max_episodes + 1):
         plot_data.append([episode, np.array(reward_list).mean(), np.array(reward_list).std()])
         reward_list = []
 
-
 # Save the final model
 agent.save("final_model")
 
@@ -85,6 +82,6 @@ plt.fill_between([x[0] for x in plot_data], [x[1] - x[2] for x in plot_data], [x
                  alpha=0.2, color='tab:blue')
 plt.xlabel('Episode number')
 plt.ylabel('Episode reward')
-plt.title('DDPG Agent - BipedalWalker-v3')
+plt.title('SAC Agent - BipedalWalker-v3')
 plt.savefig("reward_plot.png")
 plt.show()

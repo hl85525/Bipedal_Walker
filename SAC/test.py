@@ -1,10 +1,8 @@
 import gym
-from agent import DDPG_Agent
+from agent import SAC_Agent
 import torch
 
-# Make sure you specify the appropriate render mode if necessary
-env = gym.make("BipedalWalker-v3", render_mode="human")
-
+env = gym.make("BipedalWalker-v3", render_mode="human")  # or BipedalWalkerHardcore-v3
 obs_dim = env.observation_space.shape[0]
 act_dim = env.action_space.shape[0]
 max_action = float(env.action_space.high[0])
@@ -15,28 +13,28 @@ kwargs = {
     "max_action": max_action,
     "gamma": 0.99,
     "net_width": 128,
+    "alpha": 0.2,
     "actor_lr": 1e-3,
     "critic_lr": 1e-3,
-    "tau": 0.005,
     "batch_size": 256,
     "replay_buffer_size": int(1e6)
 }
 
-agent = DDPG_Agent(**kwargs)
-agent.actor.load_state_dict(torch.load("ddpg_actorfinal_model.pth"))
-agent.critic.load_state_dict(torch.load("ddpg_criticfinal_model.pth"))
+agent = SAC_Agent(**kwargs)
+agent.actor.load_state_dict(torch.load("sac_actorfinal_model.pth"))
+agent.q_critic1.load_state_dict(torch.load("sac_q_critic_1final_model.pth"))
+agent.q_critic2.load_state_dict(torch.load("sac_q_critic_2final_model.pth"))
 
 num_episodes = 5
 
 for episode in range(num_episodes):
-    state = env.reset()
+    state, _ = env.reset()
     done = False
     episode_reward = 0
 
     while not done:
         action = agent.sample_action(state)
-        # Correctly unpack values considering potential additional outputs
-        next_state, reward, done, _ = env.step(action)[:4]
+        next_state, reward, done, _, _ = env.step(action)
         episode_reward += reward
         state = next_state
 
