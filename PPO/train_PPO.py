@@ -46,7 +46,7 @@ plot_data = []
 
 
 # Train the policy net & value net using the agent
-def train(env, runner, policy_net, value_net, agent, max_episode=5000):
+def train(env, runner, policy_net, value_net, agent: PPO, max_episode=5000):
     mean_total_reward = 0
     mean_length = 0
     save_dir = "./save"
@@ -54,7 +54,10 @@ def train(env, runner, policy_net, value_net, agent, max_episode=5000):
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
 
-    for i in range(max_episode):
+    ep = 0
+    reward = 0
+    # for ep in range(max_episode):
+    while reward < 300:
         # Run and episode to collect data
         with torch.no_grad():
             mb_states, mb_actions, mb_old_a_logps, mb_values, mb_returns, mb_rewards = (
@@ -67,22 +70,23 @@ def train(env, runner, policy_net, value_net, agent, max_episode=5000):
         pg_loss, v_loss, ent = agent.train(
             mb_states, mb_actions, mb_values, mb_advs, mb_returns, mb_old_a_logps
         )
-        mean_total_reward += mb_rewards.sum()
+        reward = mb_rewards.sum()
+        mean_total_reward += reward
         mean_length += len(mb_states)
         print(
             "[Episode {:4d}] total reward = {:.6f}, length = {:d}".format(
-                i, mb_rewards.sum(), len(mb_states)
+                ep, reward, len(mb_states)
             )
         )
 
-        if i % 10 == 0:
-            plot_data.append([i, mean_total_reward / 10, mean_length / 10])
+        if ep % 10 == 0:
+            plot_data.append([ep, mean_total_reward / 10, mean_length / 10])
             mean_total_reward = 0
             mean_length = 0
 
         # Show the current result & save the model
-        if i % 200 == 0:
-            print("\n[{:5d} / {:5d}]".format(i, max_episode))
+        if ep % 200 == 0:
+            print("\n[{:5d} / {:5d}]".format(ep, max_episode))
             print("----------------------------------")
             print("actor loss = {:.6f}".format(pg_loss))
             print("critic loss = {:.6f}".format(v_loss))
@@ -90,14 +94,16 @@ def train(env, runner, policy_net, value_net, agent, max_episode=5000):
             print("\nSaving the model ... ", end="")
             torch.save(
                 {
-                    "it": i,
+                    "it": ep,
                     "PolicyNet": policy_net.state_dict(),
                     "ValueNet": value_net.state_dict(),
                 },
-                os.path.join(save_dir, "model.pt"),
+                os.path.join(save_dir, f"model_{ep}.pt"),
             )
             print("Done.")
             play(policy_net)
+
+        ep += 1
 
 
 if __name__ == "__main__":
