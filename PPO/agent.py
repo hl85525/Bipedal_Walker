@@ -76,7 +76,7 @@ class PPO:
                 )
                 # v_loss1 = (sample_returns - sample_values).pow(2)
                 v_loss2 = (sample_returns - v_pred_clip).pow(2)
-                v_loss = v_loss2
+                v_loss = v_loss2.mean()
                 # v_loss = torch.max(v_loss1, v_loss2).mean()
 
                 # Compute policy gradient loss
@@ -87,7 +87,7 @@ class PPO:
                 )
                 # pg_loss = torch.max(pg_loss1, pg_loss2).mean() - self.ent_weight * ent
                 # Entropy regularization
-                pg_loss = pg_loss2 - self.ent_weight * ent
+                pg_loss = pg_loss2.mean() - self.ent_weight * ent
 
                 # Train actor
                 self.opt_policy.zero_grad()
