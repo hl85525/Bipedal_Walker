@@ -1,95 +1,52 @@
 import torch
 import torch.nn as nn
-import numpy as np
+from torch.distributions.normal import Normal
+import config
 
+torch.manual_seed(config.SEED)
+torch.cuda.manual_seed(config.SEED)
 
-# AddBias module
-class AddBias(nn.Module):
-    def __init__(self, bias):
-        super(AddBias, self).__init__()
-        self._bias = nn.Parameter(bias.unsqueeze(1))
-
-    def forward(self, x):
-        bias = self._bias.t().view(1, -1)
-        return x + bias
-
-
-# Gaussian distribution with given mean & std.
-class FixedNormal(torch.distributions.Normal):
-    def log_probs(self, x):
-        return super().log_prob(x).sum(-1)
-
-    def entropy(self):
-        return super().entropy().sum(-1)
-
-    def mode(self):
-        return self.mean
-
-
-# Diagonal Gaussian module
-class DiagGaussian(nn.Module):
-    def __init__(self, inp_dim, out_dim):
-        super(DiagGaussian, self).__init__()
-        self.fc_mean = nn.Linear(inp_dim, out_dim)
-        self.b_logstd = AddBias(torch.zeros(out_dim))
-
-    def forward(self, x):
-        mean = self.fc_mean(x)
-        logstd = self.b_logstd(torch.zeros_like(mean))
-        return FixedNormal(mean, logstd.exp())
-
-
-# Policy Network
-class PolicyNet(nn.Module): 
-    def __init__(self, s_dim, a_dim):
-        super(PolicyNet, self).__init__()
+class PolicyNN(nn.Module):
+    def __init__(self, input_shape, output_shape):
+        super(PolicyNN, self).__init__()
         self.main = nn.Sequential(
-            nn.Linear(s_dim, 128), nn.ReLU(), nn.Linear(128, 128), nn.ReLU()
+            nn.Linear(input_shape, 64),
+            nn.Tanh(), # nn.ReLu() is used in the original implementation
+            nn.Linear(64, 64),
+            nn.Tanh(), # nn.ReLu() is used in the original implementation
+            nn.Linear(64, output_shape),
         )
-        self.dist = DiagGaussian(128, a_dim)
+        self.dist = nn.Parameter(torch.zeros(output_shape))
 
-    # Forward pass
-    def forward(self, state, deterministic=False):
-        feature = self.main(state)
-        dist = self.dist(feature)
+    def forward(self, x, actions=None):
+        # In stead of calculating action as output for NN, we calculate action_mean for each action (4,1)
+        # We also train input-less parameter which represent log(std)
+        actions_mean = self.main(x)
+        actions_logstd = self.dist
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        actions_std = torch.exp(actions_logstd).to(device)
 
-        if deterministic:
-            action = dist.mode()
-        else:
-            action = dist.sample()
+        # We use mean and std to calculate 4 Normal distributions
+        prob = Normal(actions_mean, actions_std)
 
-        return action, dist.log_probs(action)
-
-    # Choose an action (stochastically or deterministically)
-    def choose_action(self, state, deterministic=False):
-        feature = self.main(state)
-        dist = self.dist(feature)
-
-        if deterministic:
-            return dist.mode()
-
-        return dist.sample()
-
-    # Evaluate a state-action pair (output log-prob. & entropy)
-    def evaluate(self, state, action):
-        feature = self.main(state)
-        dist = self.dist(feature)
-        return dist.log_probs(action), dist.entropy()
+        if actions is None:
+            # To get the actions, we sample the 4 distributions
+            actions = prob.sample()
+        # To get logarithm of action probabilities we use Normal.log_prob(action) function
+        return actions, prob.log_prob(actions), torch.sum(prob.entropy(), dim=-1)
 
 
-# Value Network
-class ValueNet(nn.Module):
-    # Constructor
-    def __init__(self, s_dim):
-        super(ValueNet, self).__init__()
-        self.main = nn.Sequential(
-            nn.Linear(s_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1),
+class ValueNN(nn.Module):
+    def __init__(self, input_shape):
+        super(ValueNN, self).__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = nn.Sequential(
+            nn.Linear(input_shape, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+            nn.Linear(64, 1),
         )
 
-    # Forward pass
-    def forward(self, state):
-        return self.main(state)[:, 0]
+    def forward(self, x):
+        return self.model(x)

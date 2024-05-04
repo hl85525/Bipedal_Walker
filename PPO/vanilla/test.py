@@ -1,11 +1,10 @@
 import os
 import gym
 import torch
-import torch.nn as nn
 import numpy as np
-from envrunner import EnvRunner
-from model import PolicyNet, ValueNet
-from agent import PPO
+from model import PolicyNet
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if __name__ == "__main__":
     # Create the environment
@@ -19,7 +18,7 @@ if __name__ == "__main__":
 
     # Load the models
     save_dir = "./save"
-    model_path = os.path.join(save_dir, "model.pt")
+    model_path = os.path.join(save_dir, "model_16200_best.pt")
 
     if os.path.exists(model_path):
         print("Loading the model ... ", end="")
@@ -39,7 +38,7 @@ if __name__ == "__main__":
         while True:
             env.render()
             state_tensor = torch.tensor(
-                np.expand_dims(state, axis=0), dtype=torch.float32, device="cpu"
+                np.expand_dims(state, axis=0), dtype=torch.float32, device=device
             )
             action = (
                 policy_net.choose_action(state_tensor, deterministic=True).cpu().numpy()

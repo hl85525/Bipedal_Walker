@@ -1,150 +1,135 @@
-import os
 import gym
-import torch
+from matplotlib import pyplot as plt
 import numpy as np
-from envrunner import EnvRunner
-from model import PolicyNet, ValueNet
-from agent import PPO
-import matplotlib.pyplot as plt
+import config
+from agent import Agent
+from tester import Test
+import itertools
 from datetime import datetime
 
+def train(env, plot_data: list):
+    state, _ = env.reset()
 
-# Run an episode using the policy net
-def play(policy_net):
-    render_env = gym.make("BipedalWalker-v3", render_mode="rgb_array")
+    agent = Agent(
+        state_size=state.shape[0],
+        action_size=env.action_space.shape[0],
+        batch_size=config.BATCH_SIZE,
+    )
 
-    with torch.no_grad():
-        state, _ = render_env.reset()
-        total_reward = 0
-        length = 0
+    tester = Test(
+        state_size=state.shape[0], action_size=env.action_space.shape[0]
+    )
 
-        while True:
-            render_env.render()
-            state_tensor = torch.tensor(
-                np.expand_dims(state, axis=0), dtype=torch.float32, device="cpu"
+    for step in range(config.NUMBER_OF_STEPS):
+        should_continue_training = True
+
+        # Learning Rate and Epsilon decay.
+        # Another PPO implementation improvement.
+        agent.set_optimizer_lr_eps(step)
+    
+        # Test the model after 50 steps or if the average reward is >= 300
+        if (step + 1) % 50 == 0 or (
+            len(env.return_queue) >= 100
+            and np.mean(list(itertools.islice(env.return_queue, 90, 100))) >= 300
+        ):
+            end_train: bool = tester.test(
+                agent.agent_control.policy_nn, env
             )
-            action = (
-                policy_net.choose_action(state_tensor, deterministic=True).cpu().numpy()
-            )
-            state, reward, done, info, _ = render_env.step(action[0])
-            total_reward += reward
-            length += 1
-
-            if done:
-                print(
-                    "[Evaluation] Total reward = {:.6f}, length = {:d}".format(
-                        total_reward, length
-                    ),
-                    flush=True,
-                )
+            if end_train:
+                # We have reached the target reward of >= 300
                 break
 
-    render_env.close()
+        # Collect batch_size number of samples
+        for ep in range(config.BATCH_SIZE):
 
+            # if (step + 1) % 50 == 0:
+            #     env.render()
+    
+            # Feed current state to the policy NN and get action and its probability
+            actions, actions_logprob = agent.get_action(state)
 
-plot_data = []
+            # Use given action and retrieve new state, reward agent recieved 
+            # and whether episode is finished flag
+            new_state, reward, done, _, _ = env.step(actions)
 
-
-# Train the policy net & value net using the agent
-def train(env, runner, policy_net, value_net, agent: PPO, max_episode=5000):
-    mean_total_reward = 0
-    mean_length = 0
-    save_dir = "./save"
-
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
-
-    ep = 0
-    reward = 0
-    # for ep in range(max_episode):
-    while reward < 300:
-        # Run and episode to collect data
-        with torch.no_grad():
-            mb_states, mb_actions, mb_old_a_logps, mb_values, mb_returns, mb_rewards = (
-                runner.run(env, policy_net, value_net)
+            # Store step information to memory for future use
+            agent.add_to_memory(
+                state, actions, actions_logprob, new_state, reward, done, ep
             )
-            mb_advs = mb_returns - mb_values
-            mb_advs = (mb_advs - mb_advs.mean()) / (mb_advs.std() + 1e-6)
+            state = new_state
 
-        # Train the model using the collected data
-        pg_loss, v_loss, ent = agent.train(
-            mb_states, mb_actions, mb_values, mb_advs, mb_returns, mb_old_a_logps
-        )
-        reward = mb_rewards.sum()
-        mean_total_reward += reward
-        mean_length += len(mb_states)
-        print(
-            "[Episode {:4d}] total reward = {:.6f}, length = {:d}".format(
-                ep, reward, len(mb_states)
-            )
-        )
 
-        if ep % 10 == 0:
-            plot_data.append([ep, mean_total_reward / 10, mean_length / 10])
-            mean_total_reward = 0
-            mean_length = 0
+            if done:
+                state, _ = env.reset()
 
-        # Show the current result & save the model
-        if ep % 200 == 0:
-            print("\n[{:5d} / {:5d}]".format(ep, max_episode))
-            print("----------------------------------")
-            print("actor loss = {:.6f}".format(pg_loss))
-            print("critic loss = {:.6f}".format(v_loss))
-            print("entropy = {:.6f}".format(ent))
-            print("\nSaving the model ... ", end="")
-            torch.save(
-                {
-                    "it": ep,
-                    "PolicyNet": policy_net.state_dict(),
-                    "ValueNet": value_net.state_dict(),
-                },
-                os.path.join(save_dir, f"model_{ep}.pt"),
-            )
-            print("Done.")
-            play(policy_net)
+        # For value (critic) function clipping, we need NN output before update
+        # which we will use as baseline to see how much new output is different 
+        # and to clip it if it's too different
+        agent.calculate_old_value_state()
+    
+        # Calculate advantage for policy NN loss
+        agent.calculate_advantage()
 
-        ep += 1
+        # Instead of shuffling whole memory, we will create indices and shuffle them after each update
+        # This is another PPO implementation improvement.
+        batch_indices = np.arange(config.BATCH_SIZE)
 
+        # We will use every collected step to update NNs config.UPDATE_STEPS times
+        agent.reset_noise()
+        for _ in range(config.UPDATE_STEPS):
+            np.random.shuffle(batch_indices)
+
+            # Split the memory to mini-batches and use them to update NNs
+            for i in range(0, config.BATCH_SIZE, config.MINIBATCH_SIZE):
+                should_continue_training = agent.update(batch_indices[i : i + config.MINIBATCH_SIZE])
+                if not should_continue_training:
+                    # "Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
+                    print(f"Early stopping at step {step} due to reaching max kl")
+                    break
+            if not should_continue_training:
+                break
+        
+        if not should_continue_training:
+            continue
+
+        # Record losses and rewards and print them to console
+        agent.record_results(step, env, plot_data)
+
+    tester.env.close()
+    env.close()
 
 if __name__ == "__main__":
-    # Create the environment
-    env = gym.make("BipedalWalker-v3", render_mode="rgb_array")
-    state_space_dim = env.observation_space.shape[0]
-    action_space_dim = env.action_space.shape[0]
-    print("State Space Dimensions: ", state_space_dim)
-    print("Action Space Dimensions: ", action_space_dim)
+    env = gym.make(config.ENV_NAME, render_mode="rgb_array")
+    env = gym.wrappers.ClipAction(env)
+    env = gym.wrappers.RecordEpisodeStatistics(env)
+    env = gym.wrappers.RecordVideo(
+        env,
+        "recordings",
+        name_prefix="rl-video" + datetime.now().strftime("%Y%m%d%H%M%S"),
+    )
+    env = gym.wrappers.NormalizeObservation(env)
+    env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
+    env = gym.wrappers.NormalizeReward(env)
+    env = gym.wrappers.TransformReward(env, lambda rew: np.clip(rew, -10, 10))
+    np.random.seed(config.SEED)
+    plot_data = []
+    train(env, plot_data)
 
-    # Create the policy net & value net
-    policy_net = PolicyNet(state_space_dim, action_space_dim)
-    value_net = ValueNet(state_space_dim)
-    print(policy_net)
-    print(value_net)
-
-    # Create the runner
-    runner = EnvRunner(state_space_dim, action_space_dim)
-
-    # Create a PPO agent for training
-    agent = PPO(policy_net, value_net)
-
-    # Train the network
-    train(env, runner, policy_net, value_net, agent)
-
-    # Plot the reward graph
+    # Save the plot data
     plt.figure(figsize=(8, 5))
     plt.plot(
         [x[0] for x in plot_data], [x[1] for x in plot_data], "-", color="tab:blue"
     )
-    plt.fill_between(
-        [x[0] for x in plot_data],
-        [x[1] - x[2] for x in plot_data],
-        [x[1] + x[2] for x in plot_data],
-        alpha=0.2,
-        color="tab:blue",
-    )
+    # plt.fill_between(
+    #     [x[0] for x in plot_data],
+    #     [x[1] - x[2] for x in plot_data],
+    #     [x[1] + x[2] for x in plot_data],
+    #     alpha=0.2,
+    #     color="tab:blue",
+    # )
     plt.xlabel("Episode number")
     plt.ylabel("Episode reward")
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    plt.title("Training Reward Plot")
+    plt.title("PPO Agent - BipedalWalker-v3")
     plt.savefig(f"reward_plot_{timestamp}.png")
     plt.show()
-    env.close()
