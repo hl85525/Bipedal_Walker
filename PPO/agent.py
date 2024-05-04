@@ -308,4 +308,4 @@ class Agent:
         self.policy_loss_m = []
         self.ep_count = env.episode_count
         # Store reward plot data
-        plot_data.append([n_step, np.round(np.mean(env.return_queue), 2) + 15])
+        plot_data.append([n_step, np.round(np.mean(env.return_queue), 2)])
