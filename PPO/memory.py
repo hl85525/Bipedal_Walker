@@ -5,7 +5,9 @@ import torch
 class Memory:
 
     def __init__(self, state_size, action_size, batch_size):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
         self.batch_size = batch_size
         self.states = torch.zeros(batch_size, state_size).to(self.device)
         self.actions = torch.zeros(batch_size, action_size).to(self.device)
