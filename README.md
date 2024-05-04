@@ -22,6 +22,6 @@ python3 train_<ALGORITHM_NAME>.py
 ## Results
 The results of our TD3 implementation can be seen below:
 - BipedalWalker-v3: ![BipedalWalker-v3](./TD3/reward_plot.png)
-![BipedalWalker-v3 Video](./TD3/basic_success.MOV)
+![BipedalWalker-v3 Video](./TD3/basic_success.mov)
 - BipedalWalkerHardcore-v3: ![BipedalWalkerHardcore-v3](./TD3/reward_plot_hardcore.png)
 ![BipedalWalkerHardcore-v3 Video](./TD3/hardcore_success.mov)
