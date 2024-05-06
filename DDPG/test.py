@@ -1,45 +1,32 @@
 import gym
-from agent import DDPG_Agent
+import random
 import torch
+import numpy as np
+from collections import deque
+import matplotlib.pyplot as plt
 
-# Make sure you specify the appropriate render mode if necessary
-env = gym.make("BipedalWalker-v3", render_mode="human")
 
-obs_dim = env.observation_space.shape[0]
-act_dim = env.action_space.shape[0]
-max_action = float(env.action_space.high[0])
+env = gym.make("BipedalWalker-v2")
+env.seed(10)
+agent = DDPG_Agent(
+    state_dim=env.observation_space.shape[0],
+    action_dim=env.action_space.shape[0],
+    random_seed=10,
+)
 
-kwargs = {
-    "state_dim": obs_dim,
-    "action_dim": act_dim,
-    "max_action": max_action,
-    "gamma": 0.99,
-    "net_width": 128,
-    "actor_lr": 1e-3,
-    "critic_lr": 1e-3,
-    "tau": 0.005,
-    "batch_size": 256,
-    "replay_buffer_size": int(1e6)
-}
+agent.actor_local.load_state_dict(torch.load("actor_checkpoint.pth"))
+agent.critic_local.load_state_dict(torch.load("critic_checkpoint.pth"))
 
-agent = DDPG_Agent(**kwargs)
-agent.actor.load_state_dict(torch.load("ddpg_actorfinal_model.pth"))
-agent.critic.load_state_dict(torch.load("ddpg_criticfinal_model.pth"))
-
-num_episodes = 5
-
-for episode in range(num_episodes):
+while True:
     state = env.reset()
-    done = False
-    episode_reward = 0
+    agent.reset()
 
-    while not done:
-        action = agent.sample_action(state)
-        # Correctly unpack values considering potential additional outputs
-        next_state, reward, done, _ = env.step(action)[:4]
-        episode_reward += reward
+    while True:
+        action = agent.current_action(state)
+        env.render()
+        next_state, reward, done, _ = env.step(action)
         state = next_state
+        if done:
+            break
 
-    print(f"Episode {episode+1}: Reward = {episode_reward}")
-
-env.close()
+    env.close()

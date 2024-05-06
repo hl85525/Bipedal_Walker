@@ -1,0 +1,12 @@
+bin/
+.idea/
+lib/
+include/
+pyvenv.cfg
+
+*.pth
+rl-video*
+reward-plot*
+reward_plot*
+.DS_Store
+*.pyc
