@@ -33,21 +33,21 @@ class EnvRunner:
 
         return returns
 
-    # def compute_gae(self, rewards, values, last_value):
-    #     advs = np.zeros_like(rewards)
-    #     n_step = len(rewards)
-    #     last_gae_lam = 0.0
+    def compute_gae(self, rewards, values, last_value):
+        advs = np.zeros_like(rewards)
+        n_step = len(rewards)
+        last_gae_lam = 0.0
 
-    #     for t in reversed(range(n_step)):
-    #         if t == n_step - 1:
-    #             next_value = last_value
-    #         else:
-    #             next_value = values[t + 1]
+        for t in reversed(range(n_step)):
+            if t == n_step - 1:
+                next_value = last_value
+            else:
+                next_value = values[t + 1]
 
-    #         delta = rewards[t] + self.gamma * next_value - values[t]
-    #         advs[t] = last_gae_lam = delta + self.gamma * self.lamb * last_gae_lam
+            delta = rewards[t] + self.gamma * next_value - values[t]
+            advs[t] = last_gae_lam = delta + self.gamma * self.lamb * last_gae_lam
 
-    #     return advs + values
+        return advs + values
 
     # Run an episode using the policy net & value net
     def run(self, env, policy_net, value_net):
@@ -91,8 +91,8 @@ class EnvRunner:
             .numpy()
         )
 
-        mb_returns = self.compute_discounted_return(
-            self.mb_rewards[:episode_len], last_value
+        mb_returns = self.compute_gae(
+            self.mb_rewards[:episode_len], self.mb_values[:episode_len], last_value
         )
         return (
             self.mb_states[:episode_len],

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MAX_EPISODES = 9000
+MAX_EPISODES = 10000
 
 # Run an episode using actor
 def play(policy_net):
@@ -149,11 +149,11 @@ def train(
 if __name__ == "__main__":
     # Create the environment
     env = gym.make("BipedalWalker-v3", render_mode="rgb_array")
-    # env = gym.wrappers.RecordVideo(
-    #     env,
-    #     "recordings",
-    #     name_prefix="rl-video" + datetime.now().strftime("%Y%m%d%H%M%S"),
-    # )
+    env = gym.wrappers.RecordVideo(
+        env,
+        "recordings",
+        name_prefix="rl-video" + datetime.now().strftime("%Y%m%d%H%M%S"),
+    )
     env = gym.wrappers.ClipAction(env)
     state_space_dim = env.observation_space.shape[0]
     action_space_dim = env.action_space.shape[0]

@@ -18,11 +18,11 @@ if __name__ == "__main__":
     env = gym.make(config.ENV_NAME, render_mode="rgb_array")
     env = gym.wrappers.RecordEpisodeStatistics(env)
     env = gym.wrappers.ClipAction(env)
-    env = gym.wrappers.RecordVideo(
-        env,
-        "bestRecordings",
-        name_prefix="rl-video" + PATH_MODEL[12:22],
-    )
+    # env = gym.wrappers.RecordVideo(
+    #     env,
+    #     "bestRecordings",
+    #     name_prefix="rl-video" + PATH_MODEL[12:22],
+    # )
     state, _ = env.reset()
 
     state = (state - obs_rms_mean) / np.sqrt(obs_rms_var + epsilon)
@@ -31,10 +31,22 @@ if __name__ == "__main__":
     policy_nn = PolicyNN(
         input_shape=state.shape[0], output_shape=env.action_space.shape[0]
     ).to(device)
-    policy_nn.load_state_dict(torch.load(PATH_MODEL, map_location=device))
+    model = torch.load(PATH_MODEL, map_location=device)
+    # TODO: Fix weird model loading error
+    # This is a makeshift solution to load the model
+    # Change actions_mean to main and actions_logstd to dist
+    model["main.0.weight"] = model.pop("actions_mean.0.weight")
+    model["main.0.bias"] = model.pop("actions_mean.0.bias")
+    model["main.2.weight"] = model.pop("actions_mean.2.weight")
+    model["main.2.bias"] = model.pop("actions_mean.2.bias")
+    model["main.4.weight"] = model.pop("actions_mean.4.weight")
+    model["main.4.bias"] = model.pop("actions_mean.4.bias")
+    # Change dist to main
+    model["dist"] = model.pop("actions_logstd")
+    policy_nn.load_state_dict(model)
     for n_episode in range(config.NUMBER_OF_EPISODES):
         print(".", end=",")
-        env.start_video_recorder()
+        # env.start_video_recorder()
         while True:
             actions, _, _ = policy_nn(torch.tensor(state, dtype=torch.float, device=device))
             new_state, reward, done, _, _ = env.step(actions.cpu().detach().numpy())
@@ -45,6 +57,6 @@ if __name__ == "__main__":
                 state, _ = env.reset()
                 print("Done: " + str(n_episode))
                 break
-        env.close_video_recorder()
+        # env.close_video_recorder()
     print("  Mean 100 test reward: " + str(np.round(np.mean(env.return_queue), 2)))
     env.close()

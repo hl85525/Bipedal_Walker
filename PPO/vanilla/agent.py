@@ -73,16 +73,19 @@ class Agent:
                 ent = sample_ents.mean()
 
                 # Compute value loss using clipped value
+                v_loss1 = (sample_returns - sample_values).pow(2)
                 v_pred_clip = sample_old_values + torch.clamp(
                     sample_values - sample_old_values, -self.clip_val, self.clip_val
-                )
-                v_loss = (sample_returns - v_pred_clip).pow(2).mean()
+                ).pow(2)
+                v_loss = torch.max(v_loss1, v_pred_clip).mean()
 
                 # Compute policy gradient loss
                 ratio = (sample_a_logps - sample_old_a_logps).exp()
-                pg_loss = (-sample_advs * torch.clamp(
+                pg_loss1 = -sample_advs * ratio
+                pg_loss2 = (-sample_advs * torch.clamp(
                     ratio, 1.0 - self.clip_val, 1.0 + self.clip_val
                 ) - self.ent_weight * ent).mean() # Entropy regularization
+                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Train actor
                 self.opt_policy.zero_grad()

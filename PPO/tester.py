@@ -4,6 +4,7 @@ import torch
 import config
 from model import PolicyNN
 import json
+from datetime import datetime
 
 
 class Test:
@@ -80,8 +81,9 @@ class Test:
                 "Goal reached! Mean reward over 100 episodes is "
                 + str(np.mean(self.env.return_queue))
             )
+            datetime_save = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             torch.save(
-                self.policy_nn.state_dict(), "models/model" + config.date_time + ".p"
+                self.policy_nn.state_dict(), "models/model" + datetime_save + ".p"
             )
             data = {
                 "obs_rms_mean": env.obs_rms.mean.tolist(),
@@ -89,7 +91,7 @@ class Test:
                 "eps": env.epsilon,
             }
             with open(
-                "models/data" + config.date_time + ".json", "w", encoding="utf-8"
+                "models/data" + datetime_save + ".json", "w", encoding="utf-8"
             ) as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             state, _ = self.env.reset()

@@ -19,7 +19,7 @@ class PolicyNN(nn.Module):
         self.dist = nn.Parameter(torch.zeros(output_shape))
 
     def forward(self, x, actions=None):
-        # In stead of calculating action as output for NN, we calculate action_mean for each action (4,1)
+        # Instead of calculating action as output for NN, we calculate action_mean for each action (4,1)
         # We also train input-less parameter which represent log(std)
         actions_mean = self.main(x)
         actions_logstd = self.dist
