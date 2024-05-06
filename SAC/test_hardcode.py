@@ -23,7 +23,7 @@ def test_model_with_rendering(env, agent, n_episodes=10, max_t_step=750):
 
 
 # Set up the environment
-env = gym.make('BipedalWalker-v3')
+env = gym.make('BipedalWalkerHardcore-v3')
 state_size = env.observation_space.shape[0]
 action_size = env.action_space.shape[0]
 clip_low, clip_high = env.action_space.low, env.action_space.high
@@ -32,7 +32,7 @@ clip_low, clip_high = env.action_space.low, env.action_space.high
 agent = SACAgent(Actor, Critic, clip_low, clip_high, state_size=state_size, action_size=action_size)
 
 # Load the trained models
-agent.load_ckpt("BipedalWalker-v3", "BipedalWalker-v3")
+agent.load_ckpt("BipedalWalkerHardcore-v3", "BipedalWalkerHardcore-v3")
 
 # Run the testing with rendering
 test_model_with_rendering(env, agent, n_episodes=5)
