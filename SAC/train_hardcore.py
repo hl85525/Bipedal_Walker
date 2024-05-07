@@ -56,7 +56,7 @@ clip_low, clip_high = env.action_space.low, env.action_space.high
 agent = SACAgent(Actor, Critic, clip_low, clip_high, state_size=state_size, action_size=action_size)
 
 # Train the agent
-scores = train(env, agent, n_episodes=10, model_type='BipedalWalkerHardcore-v3', env_type='BipedalWalkerHardcore-v3',
+scores = train(env, agent, n_episodes=3, model_type='BipedalWalkerHardcore-v3', env_type='BipedalWalkerHardcore-v3',
                score_limit=300.0, explore_episode=50, max_t_step=750)
 
 # Save the trained models
