@@ -28,10 +28,11 @@ def train(env, plot_data: list):
         agent.set_optimizer_lr_eps(step)
     
         # Test the model after 50 steps or if the average reward is >= 300
-        if (step + 1) % 50 == 0 or (
+        if (step + 1) % 150 == 0 or (
             len(env.return_queue) >= 100
             and np.mean(list(itertools.islice(env.return_queue, 90, 100))) >= 300
         ):
+            print("[Evaluation] Testing the model")
             end_train: bool = tester.test(
                 agent.agent_control.policy_nn, env
             )

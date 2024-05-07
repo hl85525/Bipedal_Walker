@@ -32,11 +32,9 @@ class Test:
         prev_reward = -50000  # Arbitrary large negative number
         has_reward_changed = False
         total_reward = 0
-        for n_episode in range(config.NUMBER_OF_EPISODES):
+        for _ in range(config.NUMBER_OF_EPISODES):
             print(".", end="")
             while True:
-                if n_episode % 25 == 0:
-                    self.env.render()
                 actions, _, _ = self.policy_nn(
                     torch.tensor(state, dtype=torch.float, device=self.device)
                 )
@@ -57,7 +55,11 @@ class Test:
                 if total_reward < -400:
                     print(
                         "[Evaluation] Total reward = {:.6f}".format(total_reward),
-                        flush=True,
+                    )
+                    break
+                if num_steps_taken > 1000:
+                    print(
+                        "[Evaluation] Total reward in 1000 steps = {:.6f}".format(total_reward),
                     )
                     break
                 state = new_state
@@ -68,6 +70,11 @@ class Test:
                 if done:
                     state, _ = self.env.reset()
                     break
+            
+            num_steps_taken = 0
+            prev_reward = -50000
+            has_reward_changed = False
+            total_reward = 0
         print("]")
         print(
             "  Mean 100 test reward: "
